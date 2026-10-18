@@ -1,106 +1,39 @@
-    name: Agentic Benchmark - Nightly 2 AM IST
+name: Agentic Benchmark - Nightly 2 AM IST
 
 on:
   schedule:
-    # 2 AM IST = 8:30 PM UTC previous day (IST is UTC+5:30)
     - cron: '30 20 * * *'
-  workflow_dispatch:  # Allow manual run
+  workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   agentic-benchmark:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python 3.11 (Stable for Vector DB)
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
-
+          
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          # Light vector DB - No segfault on Linux
           pip install scikit-learn numpy pytest allure-pytest pandas
-          # For promptfoo - Node based
-          npm install -g promptfoo || true
-
-      - name: Build Vector DB - How Chennai Becomes Numbers
+      
+      - name: Build Vector DB
         run: |
           python rag_vector/app.py --build-db --docs ./docs/BRD_dummy.txt
-          echo "Vector DB Built - Shape (8,57) - 8 docs x 57 numbers"
           python rag_vector/app.py --query "Madras to Trivandrum train"
-          python rag_vector/app.py --query "Train to Mars"
-
-      - name: Run 4-Layer Agentic Tests
+      
+      - name: Run Tests
         run: |
           python -m pytest tests/ -v --alluredir=allure-results
-          echo "✅ 8/8 Tests - Tool Calling, Hallucination, Security, Consistency"
-
-      - name: Run Promptfoo Benchmark (If Config Exists)
-        continue-on-error: true
-        run: |
-          if [ -f "promptfooconfig.yaml" ]; then
-            npx promptfoo eval -c promptfooconfig.yaml --repeat 3
-            npx promptfoo view --no-open &
-          else
-            echo "No promptfooconfig.yaml - Using pytest as benchmark"
-          fi
-
-      - name: Calculate RAGAS Scores (Mock for POC)
-        run: |
-          echo "Calculating Faithfulness, Context Recall, Relevancy"
-          python -c "
-          import json
-          results = {
-            'tool_calling_fidelity': 0.95,
-            'hallucination_rate': 0.02,
-            'faithfulness': 0.92,
-            'context_recall': 0.89,
-            'consistency_5x': 1.0,
-            'security_block_rate': 1.0
-          }
-          print(json.dumps(results, indent=2))
-          with open('benchmark_scores.json', 'w') as f:
-              json.dump(results, f)
-          "
-
-      - name: Upload Allure Results
+      
+      - name: Upload Results
         uses: actions/upload-artifact@v4
         with:
           name: allure-results
           path: allure-results
-
-      - name: Upload Benchmark Scores
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-scores
-          path: benchmark_scores.json
-
-      - name: Deploy Allure Report to GitHub Pages
-        if: always()
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./allure-results
-          destination_dir: allure-report
-
-      - name: Summary - What This Job Does (For US Client 2AM IST Night Shift)
-        run: |
-          echo "### 🌙 Nightly Agentic Benchmark - 2 AM IST" >> $GITHUB_STEP_SUMMARY
-          echo "- **Time:** 2 AM IST = 8:30 PM UTC (US client morning)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Task:** Run Golden Dataset (200 queries) against Banking Chatbot" >> $GITHUB_STEP_SUMMARY
-          echo "- **4 Layers Tested:**" >> $GITHUB_STEP_SUMMARY
-          echo "  1. Tool Calling Fidelity - Did searchTrains called?" >> $GITHUB_STEP_SUMMARY
-          echo "  2. RAG Context Recall - Madras finds Chennai?" >> $GITHUB_STEP_SUMMARY
-          echo "  3. Flakiness - 5x repeat consistency >80%" >> $GITHUB_STEP_SUMMARY
-          echo "  4. Security - Prompt injection blocked?" >> $GITHUB_STEP_SUMMARY
-          echo "- **Output:** Faithfulness 0.92, Allure Report, promptfoo metrics" >> $GITHUB_STEP_SUMMARY
-          echo "- **Vector DB:** Chennai -> [0.8,0,0.7,0.9] - Cosine Similarity 0.92" >> $GITHUB_STEP_SUMMARY
-          cat benchmark_scores.json >> $GITHUB_STEP_SUMMARY
